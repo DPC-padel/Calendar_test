@@ -813,7 +813,7 @@ function filtered(){
   const today=new Date();today.setHours(0,0,0,0);
   const we=new Date(today);we.setDate(we.getDate()+7);
   return allEvents.filter(ev=>{
-    const d=new Date(ev.date+"T00:00:00");
+  const d = parseSheetDate(ev.date);
     if(d<today)return false;
     if(currentFilter==="open")return confirmedCnt(ev.id)<ev.totalSlots;
     if(currentFilter==="today")return d.toDateString()===today.toDateString();
