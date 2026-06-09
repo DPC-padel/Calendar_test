@@ -278,8 +278,6 @@
               <input type="text" id="evCost" placeholder="e.g. ₹500 per person, ₹800 per pair, Free"/>
               <div class="hint">Shown on the event card and in the booking modal.</div>
             </div>
-
-            <!-- Payment Links divider -->
             <div class="form-section-divider">
               <span class="fsd-label">Payment Links</span>
               <div class="fsd-line"></div>
@@ -354,8 +352,6 @@
         </div>
         <div class="fg"><label>Total Slots</label><input type="number" id="editSlots" min="1" max="100"/></div>
         <div class="fg ff"><label>Cost per Person</label><input type="text" id="editCost" placeholder="e.g. ₹500 per person"/></div>
-
-        <!-- Payment Links divider -->
         <div class="form-section-divider">
           <span class="fsd-label">Payment Links</span>
           <div class="fsd-line"></div>
@@ -418,7 +414,10 @@ const waitlistCnt  = id => allRSVPs.filter(r=>r.eventId===id && r.status==="wait
 async function init(){
   try{
     [allEvents,allRSVPs]=await Promise.all([Sheets.fetchEvents(),Sheets.fetchRSVPs()]);
-    allEvents.sort((a,b)=>new Date(a.date)-new Date(b.date));
+    allEvents.sort((a,b)=>{
+      const da=parseSheetDate(a.date), db=parseSheetDate(b.date);
+      return (da||0)-(db||0);
+    });
     renderOverview(); renderRSVPs(); buildFilter();
   }catch(e){
     document.getElementById("overviewList").innerHTML=`<div class="loading-row" style="color:var(--red)">Error: ${e.message}</div>`;
@@ -428,7 +427,10 @@ async function init(){
 
 function renderOverview(){
   const today=new Date();today.setHours(0,0,0,0);
-  const up=allEvents.filter(e=>new Date(e.date+"T00:00:00")>=today);
+  const up=allEvents.filter(e=>{
+    const d=parseSheetDate(e.date);
+    return d && !isNaN(d) && d>=today;
+  });
   const totalS=up.reduce((s,e)=>s+e.totalSlots,0);
   const takenS=up.reduce((s,e)=>s+confirmedCnt(e.id),0);
   const totalWait=allRSVPs.filter(r=>r.status==="waitlist").length;
@@ -443,14 +445,17 @@ function renderOverview(){
   }
   document.getElementById("overviewList").innerHTML=up.map(ev=>{
     const taken=confirmedCnt(ev.id), wl=waitlistCnt(ev.id);
-   const d = parseSheetDate(ev.date);
+    // ── FIX: use parseSheetDate ──
+    const d=parseSheetDate(ev.date);
+    const dayNum  = d && !isNaN(d) ? d.getDate() : "—";
+    const monStr  = d && !isNaN(d) ? d.toLocaleDateString("en-IN",{month:"short"}).toUpperCase() : "—";
     const timeStr=formatTimeRange(ev.startTime,ev.endTime);
     const linkBadges=[
       ev.link1?`<span title="Single pay link set" style="font-size:9px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:1px 6px;font-weight:700;letter-spacing:1px;">👤 Pay Link</span>`:"",
       ev.link2?`<span title="Partner pay link set" style="font-size:9px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;padding:1px 6px;font-weight:700;letter-spacing:1px;">👥 Pay Link</span>`:"",
     ].filter(Boolean).join(" ");
     return `<div class="ev-row">
-      <div class="er-date"><div class="er-day">${d.getDate()}</div><div class="er-mon">${d.toLocaleDateString("en-IN",{month:"short"}).toUpperCase()}</div></div>
+      <div class="er-date"><div class="er-day">${dayNum}</div><div class="er-mon">${monStr}</div></div>
       <div class="er-body">
         <div class="er-title">${ev.title}</div>
         <div class="er-meta">
@@ -545,7 +550,11 @@ document.getElementById("createBtn").addEventListener("click",async()=>{
   try{
     const ev={id:genId(),title,date,startTime,endTime,location:loc,game,level,totalSlots:slots,cost,link1,link2};
     await Sheets.addEvent(ev);
-    allEvents.push(ev);allEvents.sort((a,b)=>new Date(a.date)-new Date(b.date));
+    allEvents.push(ev);
+    allEvents.sort((a,b)=>{
+      const da=parseSheetDate(a.date), db=parseSheetDate(b.date);
+      return (da||0)-(db||0);
+    });
     renderOverview();
     const sel=document.getElementById("evFilter"),o=document.createElement("option");
     o.value=ev.id;o.textContent=`${ev.title} — ${formatDateShort(ev.date)}`;sel.appendChild(o);
@@ -647,17 +656,6 @@ async function markPaid(btn, eventId, phone) {
     btn.disabled = false;
     alert("Error: " + err.message);
   }
-}
-
-// needed by openEditModal — mirrors the one in config.js
-function normalizeTimeValue(timeStr) {
-  if (!timeStr) return "";
-  const raw = String(timeStr).trim();
-  const hhmmMatch = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (hhmmMatch) return `${hhmmMatch[1].padStart(2,"0")}:${hhmmMatch[2]}`;
-  const isoMatch = raw.match(/T(\d{2}):(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}:${isoMatch[2]}`;
-  return raw;
 }
 </script>
 </body>
