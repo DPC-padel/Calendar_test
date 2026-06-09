@@ -63,7 +63,15 @@ const Sheets = {
     return json.data;
   },
 };
-// Handles YYYY-MM-DD, DD/MM/YYYY, and Google Sheets serial numbers
+
+// ── Utilities ──────────────────────────────────────────────
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// ── Robust date parser ─────────────────────────────────────
+// Handles: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY (US), Google Sheets serial numbers
 function parseSheetDate(dateStr) {
   if (!dateStr && dateStr !== 0) return null;
 
@@ -72,23 +80,21 @@ function parseSheetDate(dateStr) {
   // Google Sheets serial number (e.g. 45678)
   const asNum = Number(raw);
   if (!isNaN(asNum) && asNum > 1000 && !raw.includes("/") && !raw.includes("-")) {
-    // Sheets epoch is Dec 30 1899
+    // Sheets epoch is Dec 30, 1899; JS epoch is Jan 1, 1970
     const msPerDay = 86400000;
     return new Date(Math.round((asNum - 25569) * msPerDay));
   }
 
-  // DD/MM/YYYY
+  // DD/MM/YYYY  (Indian / Sheets default for en-IN locale)
   const dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmyMatch) {
-    return new Date(`${dmyMatch[3]}-${dmyMatch[2].padStart(2,"0")}-${dmyMatch[1].padStart(2,"0")}T00:00:00`);
+    return new Date(
+      `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}T00:00:00`
+    );
   }
 
-  // YYYY-MM-DD (already correct)
-  return new Date(raw + (raw.includes("T") ? "" : "T00:00:00"));
-}
-// ── Utilities ──────────────────────────────────────────────
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // YYYY-MM-DD or ISO string — append time only if not already there
+  return new Date(raw.includes("T") ? raw : raw + "T00:00:00");
 }
 
 function formatDate(dateStr) {
@@ -105,17 +111,6 @@ function formatDateShort(dateStr) {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
 
-function formatDayLabel(dateStr) {
-  const d = parseSheetDate(dateStr);
-  if (!d || isNaN(d)) return "";
-  const weekday = d.toLocaleDateString("en-IN", { weekday: "long" });
-  const day     = d.getDate();
-  const suffix  = day === 1 || day === 21 || day === 31 ? "st"
-                : day === 2 || day === 22 ? "nd"
-                : day === 3 || day === 23 ? "rd" : "th";
-  const month   = d.toLocaleDateString("en-IN", { month: "long" });
-  return `${weekday}, ${day}${suffix} ${month}`;
-}
 function normalizeTimeValue(timeStr) {
   if (!timeStr) return "";
 
@@ -169,8 +164,6 @@ function formatTime(timeStr) {
   return `${hr}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
-
-
 function formatTimeRange(start, end) {
   if (!start) return "";
   if (!end)   return formatTime(start);
@@ -178,3 +171,14 @@ function formatTimeRange(start, end) {
 }
 
 // Get day label like "Wednesday, 29th April"
+function formatDayLabel(dateStr) {
+  const d = parseSheetDate(dateStr);
+  if (!d || isNaN(d)) return "";
+  const weekday = d.toLocaleDateString("en-IN", { weekday: "long" });
+  const day     = d.getDate();
+  const suffix  = day === 1 || day === 21 || day === 31 ? "st"
+                : day === 2 || day === 22 ? "nd"
+                : day === 3 || day === 23 ? "rd" : "th";
+  const month   = d.toLocaleDateString("en-IN", { month: "long" });
+  return `${weekday}, ${day}${suffix} ${month}`;
+}
