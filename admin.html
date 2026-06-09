@@ -443,7 +443,7 @@ function renderOverview(){
   }
   document.getElementById("overviewList").innerHTML=up.map(ev=>{
     const taken=confirmedCnt(ev.id), wl=waitlistCnt(ev.id);
-    const d=new Date(ev.date+"T00:00:00");
+   const d = parseSheetDate(ev.date);
     const timeStr=formatTimeRange(ev.startTime,ev.endTime);
     const linkBadges=[
       ev.link1?`<span title="Single pay link set" style="font-size:9px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:1px 6px;font-weight:700;letter-spacing:1px;">👤 Pay Link</span>`:"",
